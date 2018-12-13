@@ -4,6 +4,7 @@
         <Identity Id="6c042f35-bf5c-4cf2-826e-05d6d12e5309" Version="1.0" Language="en-US" Publisher="Mads Kristensen" />
         <DisplayName>VSCT IntelliSense</DisplayName>
         <Description xml:space="preserve">Gives IntelliSense for .vsct files used by Visual Studio extension authors.</Description>
+        <MoreInfo>https://github.com/madskristensen/VsctIntellisense</MoreInfo>
         <License>Resources\LICENSE</License>
         <Icon>Resources\Icon.png</Icon>
         <PreviewImage>Resources\Icon.png</PreviewImage>

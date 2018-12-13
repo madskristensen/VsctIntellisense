@@ -26,16 +26,16 @@ namespace VsctCompletion.Completion
         }
 
 
-        public Task<CompletionContext> GetCompletionContextAsync(IAsyncCompletionSession session, CompletionTrigger trigger, SnapshotPoint triggerLocation, SnapshotSpan applicableToSpan, CancellationToken token)
+        public async Task<CompletionContext> GetCompletionContextAsync(IAsyncCompletionSession session, CompletionTrigger trigger, SnapshotPoint triggerLocation, SnapshotSpan applicableToSpan, CancellationToken token)
         {
+            await EnsureInitializedAsync();
+
             if (_parser.TryGetCompletionList(triggerLocation, out IEnumerable<CompletionItem> completions))
             {
-                var context = new CompletionContext(completions.ToImmutableArray());
-
-                return Task.FromResult(context);
+                return new CompletionContext(completions.ToImmutableArray());
             }
 
-            return Task.FromResult(CompletionContext.Empty);
+            return CompletionContext.Empty;
         }
 
         public Task<object> GetDescriptionAsync(IAsyncCompletionSession session, CompletionItem item, CancellationToken token)
@@ -45,7 +45,7 @@ namespace VsctCompletion.Completion
                 return Task.FromResult<object>(tooltip.Value);
             }
 
-            return Task.FromResult<object>(item.DisplayText);
+            return Task.FromResult<object>(null);
         }
 
         public CompletionStartData InitializeCompletion(CompletionTrigger trigger, SnapshotPoint triggerLocation, CancellationToken token)
@@ -71,6 +71,14 @@ namespace VsctCompletion.Completion
             IList<ClassificationSpan> spans = _classifier.GetClassificationSpans(extent.Span);
 
             return spans.Any(s => s.ClassificationType.IsOfType("XML Attribute Value"));
+        }
+
+        private async Task EnsureInitializedAsync()
+        {
+            if (!_parser.IsInitialized)
+            {
+                await _parser.InitializeAsync();
+            }
         }
     }
 }

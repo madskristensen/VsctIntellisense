@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Xml;
 using System.Xml.XPath;
@@ -13,10 +12,11 @@ using Microsoft.VisualStudio.Imaging;
 using Microsoft.VisualStudio.Imaging.Interop;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
-using Microsoft.VisualStudio.Shell.Interop;
+using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Adornments;
 using Microsoft.VisualStudio.Text.Classification;
+using Tasks = System.Threading.Tasks;
 
 namespace VsctCompletion.Completion
 {
@@ -25,12 +25,18 @@ namespace VsctCompletion.Completion
         private readonly IAsyncCompletionSource _source;
         private readonly IClassifier _classifier;
         private static readonly ImageElement _icon = new ImageElement(KnownMonikers.TypePublic.ToImageId());
+        private static List<CompletionItem> _monikerItems = new List<CompletionItem>();
+        private static bool _isInitializing;
 
         public VsctParser(IAsyncCompletionSource source, IClassifier classifier)
         {
             _source = source;
             _classifier = classifier;
+            InitializeAsync().ConfigureAwait(false);
         }
+
+        public bool IsInitialized { get; private set; }
+        public IEnumerable<string> Attributes => new List<string> { "id", "guid", "package", "href", "editor" };
 
         public bool TryGetCompletionList(SnapshotPoint triggerLocation, out IEnumerable<CompletionItem> completions)
         {
@@ -90,6 +96,7 @@ namespace VsctCompletion.Completion
             }
             catch (Exception)
             {
+                MessageBox.Show(fragment);
                 doc = null;
                 return false;
             }
@@ -204,27 +211,7 @@ namespace VsctCompletion.Completion
 
             if (guid == "ImageCatalogGuid")
             {
-                PropertyInfo[] monikers = typeof(KnownMonikers).GetProperties(BindingFlags.Static | BindingFlags.Public);
-                foreach (PropertyInfo monikerName in monikers)
-                {
-                    var moniker = (ImageMoniker)monikerName.GetValue(null, null);
-                    var icon = new ImageElement(moniker.ToImageId());
-                    CompletionItem item = CreateItem(monikerName.Name);
-
-                    var tooltip = new Lazy<object>(() =>
-                    {
-                        return new CrispImage
-                        {
-                            Source = moniker.ToBitmap(100),
-                            Height = 100,
-                            Width = 100,
-                        };
-                    });
-
-                    item.Properties.AddProperty("tooltip", tooltip);
-
-                    list.Add(item);
-                }
+                list.AddRange(_monikerItems);
             }
             else if (guid == "guidSHLMainMenu")
             {
@@ -246,6 +233,46 @@ namespace VsctCompletion.Completion
             }
 
             return list;
+        }
+
+        public async Tasks.Task InitializeAsync()
+        {
+            if (_isInitializing)
+            {
+                return;
+            }
+
+            _isInitializing = true;
+
+            await ThreadHelper.JoinableTaskFactory.StartOnIdle(() =>
+            {
+                PropertyInfo[] monikers = typeof(KnownMonikers).GetProperties(BindingFlags.Static | BindingFlags.Public);
+                var list = new List<CompletionItem>();
+
+                foreach (PropertyInfo monikerName in monikers)
+                {
+                    var moniker = (ImageMoniker)monikerName.GetValue(null, null);
+                    var icon = new ImageElement(moniker.ToImageId());
+                    CompletionItem item = CreateItem(monikerName.Name);
+
+                    var tooltip = new Lazy<object>(() =>
+                    {
+                        return new CrispImage
+                        {
+                            Source = moniker.ToBitmap(100),
+                            Height = 100,
+                            Width = 100,
+                        };
+                    });
+
+                    item.Properties.AddProperty("tooltip", tooltip);
+                    list.Add(item);
+                }
+
+                _monikerItems = list;
+                _isInitializing = false;
+                IsInitialized = true;
+            });
         }
 
         private CompletionItem CreateItem(string value)
