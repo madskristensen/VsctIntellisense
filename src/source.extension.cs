@@ -11,7 +11,7 @@ namespace VsctCompletion
         public const string Name = "VSCT IntelliSense";
         public const string Description = @"Gives IntelliSense for .vsct files used by Visual Studio extension authors.";
         public const string Language = "en-US";
-        public const string Version = "1.0";
+        public const string Version = "1.0.1";
         public const string Author = "Mads Kristensen";
         public const string Tags = "vsix, vssdk, vsct";
     }

@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using System.Windows;
 using System.Xml;
 using System.Xml.XPath;
 using Microsoft.VisualStudio.Core.Imaging;
@@ -15,7 +14,6 @@ using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Adornments;
-using Microsoft.VisualStudio.Text.Classification;
 using Tasks = System.Threading.Tasks;
 
 namespace VsctCompletion.Completion
@@ -23,56 +21,41 @@ namespace VsctCompletion.Completion
     internal class VsctParser
     {
         private readonly IAsyncCompletionSource _source;
-        private readonly IClassifier _classifier;
         private static readonly ImageElement _icon = new ImageElement(KnownMonikers.TypePublic.ToImageId());
         private static List<CompletionItem> _monikerItems = new List<CompletionItem>();
         private static bool _isInitializing;
 
-        public VsctParser(IAsyncCompletionSource source, IClassifier classifier)
+        public VsctParser(IAsyncCompletionSource source)
         {
             _source = source;
-            _classifier = classifier;
             InitializeAsync().ConfigureAwait(false);
         }
 
         public bool IsInitialized { get; private set; }
-        public IEnumerable<string> Attributes => new List<string> { "id", "guid", "package", "href", "editor" };
 
-        public bool TryGetCompletionList(SnapshotPoint triggerLocation, out IEnumerable<CompletionItem> completions)
+        public bool IsAttributeAllowed(string attributeName)
+        {
+            string[] allowed = new[] { "id", "guid", "package", "href", "editor" };
+
+            return allowed.Contains(attributeName, StringComparer.OrdinalIgnoreCase);
+        }
+        
+        public bool TryGetCompletionList(SnapshotPoint triggerLocation, string attrName, out IEnumerable<CompletionItem> completions)
         {
             completions = null;
 
             SnapshotSpan extent = triggerLocation.GetContainingLine().Extent;
             string line = extent.GetText();
 
-            if (!TryGetXmlFragment(line, out XPathNavigator doc))
+            if (TryGetXmlFragment(line, out XPathNavigator navigator))
             {
-                return false;
+                completions = GetCompletions(ReadXmlDocument(triggerLocation.Snapshot), navigator, attrName).ToArray();
             }
 
-            IList<ClassificationSpan> spans = _classifier.GetClassificationSpans(extent);
-            ClassificationSpan attrValueSpan = spans.FirstOrDefault(s => s.Span.Start <= triggerLocation && s.Span.End >= triggerLocation && s.ClassificationType.IsOfType("XML Attribute Value"));
-            int valueSpanIndex = spans.IndexOf(attrValueSpan);
-
-            if (attrValueSpan == null || valueSpanIndex == 0)
-            {
-                return false;
-            }
-
-            ClassificationSpan attrNameSpan = spans.ElementAt(valueSpanIndex - 3);
-
-            if (!attrNameSpan.ClassificationType.IsOfType("XML Attribute"))
-            {
-                return false;
-            }
-
-            string attrName = attrNameSpan.Span.GetText();
-
-            completions = GetCompletions(ReadXmlDocument(triggerLocation.Snapshot), doc, attrName).ToArray();
-
-            return true;
+            return completions != null;
         }
 
+        
         private bool TryGetXmlFragment(string fragment, out XPathNavigator doc)
         {
             var settings = new XmlReaderSettings
@@ -96,7 +79,6 @@ namespace VsctCompletion.Completion
             }
             catch (Exception)
             {
-                MessageBox.Show(fragment);
                 doc = null;
                 return false;
             }

@@ -17,20 +17,20 @@ namespace VsctCompletion.Completion
         private readonly IClassifier _classifier;
         private readonly ITextStructureNavigator _navigator;
         private readonly VsctParser _parser;
+        private string _attributeName;
 
         public VsctCompletionSource(ITextBuffer buffer, IClassifierAggregatorService classifier, ITextStructureNavigatorSelectorService navigator)
         {
             _classifier = classifier.GetClassifier(buffer);
             _navigator = navigator.GetTextStructureNavigator(buffer);
-            _parser = new VsctParser(this, _classifier);
+            _parser = new VsctParser(this);
         }
-
 
         public async Task<CompletionContext> GetCompletionContextAsync(IAsyncCompletionSession session, CompletionTrigger trigger, SnapshotPoint triggerLocation, SnapshotSpan applicableToSpan, CancellationToken token)
         {
             await EnsureInitializedAsync();
 
-            if (_parser.TryGetCompletionList(triggerLocation, out IEnumerable<CompletionItem> completions))
+            if (_parser.TryGetCompletionList(triggerLocation, _attributeName, out IEnumerable<CompletionItem> completions))
             {
                 return new CompletionContext(completions.ToImmutableArray());
             }
@@ -50,7 +50,9 @@ namespace VsctCompletion.Completion
 
         public CompletionStartData InitializeCompletion(CompletionTrigger trigger, SnapshotPoint triggerLocation, CancellationToken token)
         {
-            if (TryFindTokenSpanAtPosition(triggerLocation, token, out SnapshotSpan span))
+            IsCompletionSupported(triggerLocation, out _attributeName, out SnapshotSpan span);
+
+            if (!string.IsNullOrEmpty(_attributeName) && _parser.IsAttributeAllowed(_attributeName))
             {
                 return new CompletionStartData(CompletionParticipation.ProvidesItems, span);
             }
@@ -58,19 +60,47 @@ namespace VsctCompletion.Completion
             return CompletionStartData.DoesNotParticipateInCompletion;
         }
 
-        private bool TryFindTokenSpanAtPosition(SnapshotPoint triggerLocation, CancellationToken token, out SnapshotSpan span)
+        private bool IsXmlAttributeValue(SnapshotPoint triggerLocation)
         {
-            TextExtent extent = _navigator.GetExtentOfWord(triggerLocation - 1);
-            span = extent.Span;
+            TextExtent extent = _navigator.GetExtentOfWord(triggerLocation - 1);            
+            IList<ClassificationSpan> spans = _classifier.GetClassificationSpans(extent.Span);
 
-            if (token.IsCancellationRequested)
+            return spans.Any(s => s.ClassificationType.IsOfType("XML Attribute Value"));
+        }
+
+        private bool IsCompletionSupported(SnapshotPoint triggerLocation, out string attributeName, out SnapshotSpan applicapleTo)
+        {
+            applicapleTo = new SnapshotSpan(triggerLocation, 0);
+            attributeName = null;
+
+            if (!IsXmlAttributeValue(triggerLocation))
             {
                 return false;
             }
 
-            IList<ClassificationSpan> spans = _classifier.GetClassificationSpans(extent.Span);
+            applicapleTo = triggerLocation.GetContainingLine().Extent;
+            string line = applicapleTo.GetText();
 
-            return spans.Any(s => s.ClassificationType.IsOfType("XML Attribute Value"));
+            IList<ClassificationSpan> spans = _classifier.GetClassificationSpans(applicapleTo);
+            ClassificationSpan attrValueSpan = spans.FirstOrDefault(s => s.Span.Start <= triggerLocation && s.Span.End >= triggerLocation && s.ClassificationType.IsOfType("XML Attribute Value"));
+            int valueSpanIndex = spans.IndexOf(attrValueSpan);
+
+            if (attrValueSpan == null || valueSpanIndex < 3)
+            {
+                return false;
+            }
+
+            applicapleTo = attrValueSpan.Span;
+            ClassificationSpan attrNameSpan = spans.ElementAt(valueSpanIndex - 3);
+
+            if (!attrNameSpan.ClassificationType.IsOfType("XML Attribute"))
+            {
+                return false;
+            }
+
+            attributeName = attrNameSpan.Span.GetText();
+
+            return true;
         }
 
         private async Task EnsureInitializedAsync()
