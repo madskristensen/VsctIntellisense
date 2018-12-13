@@ -72,22 +72,22 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.VisualStudio.Editor">
+    <PackageReference Include="Microsoft.VisualStudio.Editor" ExludeAssets="runtime">
       <Version>16.0.189-g83e7c53a57</Version>
     </PackageReference>
-    <PackageReference Include="Microsoft.VisualStudio.Imaging">
+    <PackageReference Include="Microsoft.VisualStudio.Imaging" ExludeAssets="runtime">
       <Version>16.0.28316-pre</Version>
     </PackageReference>
-    <PackageReference Include="Microsoft.VisualStudio.Imaging.Interop.14.0.DesignTime">
+    <PackageReference Include="Microsoft.VisualStudio.Imaging.Interop.14.0.DesignTime" ExludeAssets="runtime">
       <Version>14.3.26930</Version>
     </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.SDK.Analyzers">
       <Version>15.8.36</Version>
     </PackageReference>
-    <PackageReference Include="Microsoft.VisualStudio.Shell.15.0">
+    <PackageReference Include="Microsoft.VisualStudio.Shell.15.0" ExludeAssets="runtime">
       <Version>16.0.28316-pre</Version>
     </PackageReference>
-    <PackageReference Include="Microsoft.VisualStudio.Threading">
+    <PackageReference Include="Microsoft.VisualStudio.Threading" ExludeAssets="runtime">
       <Version>15.8.192</Version>
     </PackageReference>
   </ItemGroup>
