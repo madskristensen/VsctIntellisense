@@ -72,26 +72,30 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.VisualStudio.Editor" ExludeAssets="runtime">
+    <PackageReference Include="Microsoft.VisualStudio.Editor" ExcludeAssets="runtime">
       <Version>16.0.189-g83e7c53a57</Version>
     </PackageReference>
-    <PackageReference Include="Microsoft.VisualStudio.Imaging" ExludeAssets="runtime">
+    <PackageReference Include="Microsoft.VisualStudio.Imaging" ExcludeAssets="runtime">
       <Version>16.0.28316-pre</Version>
     </PackageReference>
-    <PackageReference Include="Microsoft.VisualStudio.Imaging.Interop.14.0.DesignTime" ExludeAssets="runtime">
+    <PackageReference Include="Microsoft.VisualStudio.Imaging.Interop.14.0.DesignTime" ExcludeAssets="runtime">
       <Version>14.3.26930</Version>
     </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.SDK.Analyzers">
       <Version>15.8.36</Version>
     </PackageReference>
-    <PackageReference Include="Microsoft.VisualStudio.Shell.15.0" ExludeAssets="runtime">
+    <PackageReference Include="Microsoft.VisualStudio.Shell.15.0" ExcludeAssets="runtime">
       <Version>16.0.28316-pre</Version>
     </PackageReference>
-    <PackageReference Include="Microsoft.VisualStudio.Threading" ExludeAssets="runtime">
+    <PackageReference Include="Microsoft.VisualStudio.Threading" ExcludeAssets="runtime">
       <Version>15.8.192</Version>
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="System" />
+    <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup />
