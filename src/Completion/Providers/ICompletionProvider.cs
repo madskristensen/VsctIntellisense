@@ -10,5 +10,4 @@ namespace VsctCompletion.Completion.Providers
     {
         IEnumerable<CompletionItem> GetCompletions(XmlDocument doc, XPathNavigator navigator, Func<string, CompletionItem> CreateCompletionItem);
     }
-
 }

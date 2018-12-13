@@ -2,20 +2,16 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.XPath;
 using Microsoft.VisualStudio.Core.Imaging;
 using Microsoft.VisualStudio.Imaging;
-using Microsoft.VisualStudio.Imaging.Interop;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
-using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Adornments;
 using VsctCompletion.Completion.Providers;
-using Tasks = System.Threading.Tasks;
 
 namespace VsctCompletion.Completion
 {
@@ -23,17 +19,12 @@ namespace VsctCompletion.Completion
     {
         private readonly IAsyncCompletionSource _source;
         private static readonly ImageElement _icon = new ImageElement(KnownMonikers.TypePublic.ToImageId());
-        private static List<CompletionItem> _monikerItems = new List<CompletionItem>();
-        private static bool _isInitializing;
 
         public VsctParser(IAsyncCompletionSource source)
         {
             _source = source;
-            InitializeAsync().ConfigureAwait(false);
         }
-
-        public bool IsInitialized { get; private set; }
-
+        
         public bool IsAttributeAllowed(string attributeName)
         {
             string[] allowed = new[] { "id", "guid", "package", "href", "editor" };
@@ -122,7 +113,7 @@ namespace VsctCompletion.Completion
                 case "context":
                     return new ICompletionProvider[] { new GuidSymbolProvider() };
                 case "id":
-                    return new ICompletionProvider[] { new GuidSymbolIdProvider(_monikerItems, _source, _icon) };
+                    return new ICompletionProvider[] { new GuidSymbolIdProvider(_source, _icon) };
                 case "editor":
                     return new ICompletionProvider[] { new GuidSymbolProvider(), new EditorProvider() };
                 case "href":
@@ -130,46 +121,6 @@ namespace VsctCompletion.Completion
             }
 
             return Enumerable.Empty<ICompletionProvider>();
-        }
-        
-        public async Tasks.Task InitializeAsync()
-        {
-            if (_isInitializing)
-            {
-                return;
-            }
-
-            _isInitializing = true;
-
-            await ThreadHelper.JoinableTaskFactory.StartOnIdle(() =>
-            {
-                PropertyInfo[] monikers = typeof(KnownMonikers).GetProperties(BindingFlags.Static | BindingFlags.Public);
-                var list = new List<CompletionItem>();
-
-                foreach (PropertyInfo monikerName in monikers)
-                {
-                    var moniker = (ImageMoniker)monikerName.GetValue(null, null);
-                    var icon = new ImageElement(moniker.ToImageId());
-                    CompletionItem item = CreateCompletionItem(monikerName.Name);
-
-                    var tooltip = new Lazy<object>(() =>
-                    {
-                        return new CrispImage
-                        {
-                            Source = moniker.ToBitmap(100),
-                            Height = 100,
-                            Width = 100,
-                        };
-                    });
-
-                    item.Properties.AddProperty("tooltip", tooltip);
-                    list.Add(item);
-                }
-
-                _monikerItems = list;
-                _isInitializing = false;
-                IsInitialized = true;
-            });
         }
 
         private CompletionItem CreateCompletionItem(string value)

@@ -2,8 +2,11 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.VisualStudio.Imaging;
+using Microsoft.VisualStudio.Imaging.Interop;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
 using Microsoft.VisualStudio.Text;
@@ -26,23 +29,38 @@ namespace VsctCompletion.Completion
             _parser = new VsctParser(this);
         }
 
-        public async Task<CompletionContext> GetCompletionContextAsync(IAsyncCompletionSession session, CompletionTrigger trigger, SnapshotPoint triggerLocation, SnapshotSpan applicableToSpan, CancellationToken token)
+        public Task<CompletionContext> GetCompletionContextAsync(IAsyncCompletionSession session, CompletionTrigger trigger, SnapshotPoint triggerLocation, SnapshotSpan applicableToSpan, CancellationToken token)
         {
-            await EnsureInitializedAsync();
-
             if (_parser.TryGetCompletionList(triggerLocation, _attributeName, out IEnumerable<CompletionItem> completions))
             {
-                return new CompletionContext(completions.ToImmutableArray());
+                return Task.FromResult(new CompletionContext(completions.ToImmutableArray()));
             }
 
-            return CompletionContext.Empty;
+            return Task.FromResult(CompletionContext.Empty);
         }
 
         public Task<object> GetDescriptionAsync(IAsyncCompletionSession session, CompletionItem item, CancellationToken token)
         {
-            if (item.Properties.TryGetProperty("tooltip", out Lazy<object> tooltip))
+            if (item.Properties.TryGetProperty("knownmoniker", out string name))
             {
-                return Task.FromResult<object>(tooltip.Value);
+                try
+                {
+                    PropertyInfo property = typeof(KnownMonikers).GetProperty(name, BindingFlags.Static | BindingFlags.Public);
+                    var moniker = (ImageMoniker)property.GetValue(null, null);
+
+                    var image = new CrispImage
+                    {
+                        Source = moniker.ToBitmap(100),
+                        Height = 100,
+                        Width = 100,
+                    };
+                    
+                    return Task.FromResult<object>(image);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.Write(ex);
+                }
             }
 
             return Task.FromResult<object>(null);
@@ -62,7 +80,7 @@ namespace VsctCompletion.Completion
 
         private bool IsXmlAttributeValue(SnapshotPoint triggerLocation)
         {
-            TextExtent extent = _navigator.GetExtentOfWord(triggerLocation - 1);            
+            TextExtent extent = _navigator.GetExtentOfWord(triggerLocation - 1);
             IList<ClassificationSpan> spans = _classifier.GetClassificationSpans(extent.Span);
 
             return spans.Any(s => s.ClassificationType.IsOfType("XML Attribute Value"));
@@ -101,14 +119,6 @@ namespace VsctCompletion.Completion
             attributeName = attrNameSpan.Span.GetText();
 
             return true;
-        }
-
-        private async Task EnsureInitializedAsync()
-        {
-            if (!_parser.IsInitialized)
-            {
-                await _parser.InitializeAsync();
-            }
         }
     }
 }

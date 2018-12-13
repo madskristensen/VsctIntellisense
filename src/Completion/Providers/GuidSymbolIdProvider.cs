@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Xml;
 using System.Xml.XPath;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
@@ -10,13 +11,12 @@ namespace VsctCompletion.Completion.Providers
 {
     public class GuidSymbolIdProvider : ICompletionProvider
     {
-        private readonly List<CompletionItem> _monikerItems;
         private readonly IAsyncCompletionSource _source;
         private readonly ImageElement _icon;
+        private static IEnumerable<CompletionItem> _knownIds, _knownMonikers;
 
-        public GuidSymbolIdProvider(List<CompletionItem> monikerItems, IAsyncCompletionSource source, ImageElement icon)
+        public GuidSymbolIdProvider(IAsyncCompletionSource source, ImageElement icon)
         {
-            _monikerItems = monikerItems;
             _source = source;
             _icon = icon;
         }
@@ -29,11 +29,11 @@ namespace VsctCompletion.Completion.Providers
 
             if (guid == "ImageCatalogGuid")
             {
-                list.AddRange(_monikerItems);
+                list.AddRange(GetKnownMonikers(_source, _icon));
             }
             else if (guid == "guidSHLMainMenu")
             {
-                list.AddRange(KnownIds.GetItems(_source, _icon));
+                list.AddRange(GetKnownIds(_source, _icon));
             }
             else
             {
@@ -52,5 +52,34 @@ namespace VsctCompletion.Completion.Providers
 
             return list;
         }
-    }
+
+        private IEnumerable<CompletionItem> GetKnownMonikers(IAsyncCompletionSource source, ImageElement icon)
+        {
+            if (_knownMonikers == null)
+            {
+                var list = new List<CompletionItem>();
+
+                foreach (string name in KnownMonikersList.KnownMonikerNames)
+                {
+                    var item = new CompletionItem(name, source, icon);
+                    item.Properties.AddProperty("knownmoniker", name);
+                    list.Add(item);
+                }
+
+                _knownMonikers = list;
+            }
+
+            return _knownMonikers;
+        }
+
+        private IEnumerable<CompletionItem> GetKnownIds(IAsyncCompletionSource source, ImageElement icon)
+        {
+            if (_knownIds == null)
+            {
+                _knownIds = KnownIdList.KnownIds.Select(k => new CompletionItem(k, source, icon));
+            }
+
+            return _knownIds;
+        }
+     }
 }
