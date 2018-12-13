@@ -46,9 +46,12 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Completion\KnownIds.cs" />
-    <Compile Include="Completion\VsctCompletionController.cs" />
+    <Compile Include="Completion\Providers\GuidSymbolIdProvider.cs" />
+    <Compile Include="Completion\Providers\GuidSymbolProvider.cs" />
+    <Compile Include="Completion\Providers\EditorProvider.cs" />
+    <Compile Include="Completion\Providers\HrefProvider.cs" />
+    <Compile Include="Completion\Providers\ICompletionProvider.cs" />
     <Compile Include="Completion\VsctCompletionSourceProvider.cs" />
-    <Compile Include="Completion\VsctCreationListener.cs" />
     <Compile Include="Completion\VsctParser.cs" />
     <Compile Include="ContentTypes\VsctContentTypeDefinition.cs" />
     <Compile Include="ExtensionMethods.cs" />

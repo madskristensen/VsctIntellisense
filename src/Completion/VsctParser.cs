@@ -14,6 +14,7 @@ using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Adornments;
+using VsctCompletion.Completion.Providers;
 using Tasks = System.Threading.Tasks;
 
 namespace VsctCompletion.Completion
@@ -39,7 +40,7 @@ namespace VsctCompletion.Completion
 
             return allowed.Contains(attributeName, StringComparer.OrdinalIgnoreCase);
         }
-        
+
         public bool TryGetCompletionList(SnapshotPoint triggerLocation, string attrName, out IEnumerable<CompletionItem> completions)
         {
             completions = null;
@@ -55,7 +56,7 @@ namespace VsctCompletion.Completion
             return completions != null;
         }
 
-        
+
         private bool TryGetXmlFragment(string fragment, out XPathNavigator doc)
         {
             var settings = new XmlReaderSettings
@@ -101,122 +102,36 @@ namespace VsctCompletion.Completion
 
         private IEnumerable<CompletionItem> GetCompletions(XmlDocument doc, XPathNavigator navigator, string attribute)
         {
-            if (attribute == "guid" || attribute == "package" || attribute == "context")
-            {
-                return GetGuidSymbols(doc, navigator);
-            }
-            else if (attribute == "id")
-            {
-                return GetGuidSymbolIds(doc, navigator);
-            }
-            else if (attribute == "editor")
-            {
-                return GetEditors(doc, navigator);
-            }
-            else if (attribute == "href")
-            {
-                return GetHrefs(navigator);
-            }
-
-            return Enumerable.Empty<CompletionItem>();
-        }
-
-        private IEnumerable<CompletionItem> GetEditors(XmlDocument doc, XPathNavigator navigator)
-        {
-            var list = GetGuidSymbols(doc, navigator).ToList();
-
-            list.Add(CreateItem("guidVSStd97"));
-            list.Add(CreateItem("guidVSStd2K"));
-
-            return list;
-        }
-
-        private IEnumerable<CompletionItem> GetHrefs(XPathNavigator navigator)
-        {
-            if (navigator.LocalName == "Extern")
-            {
-                yield return CreateItem("stdidcmd.h");
-                yield return CreateItem("vsshlids.h");
-            }
-            else if (navigator.LocalName == "Include")
-            {
-                yield return CreateItem("KnownImageIds.vsct");
-            }
-        }
-
-        private IEnumerable<CompletionItem> GetGuidSymbols(XmlDocument doc, XPathNavigator navigator)
-        {
-            XmlNodeList guids = doc.SelectNodes("//GuidSymbol");
-
-            foreach (XmlNode node in guids)
-            {
-                XmlAttribute name = node.Attributes["name"];
-
-                if (name != null)
-                {
-                    yield return CreateItem(name.Value);
-                }
-            }
-
-            if (navigator.LocalName.Equals("parent", StringComparison.OrdinalIgnoreCase))
-            {
-                yield return CreateItem("guidSHLMainMenu");
-            }
-            else if (navigator.LocalName.Equals("icon", StringComparison.OrdinalIgnoreCase))
-            {
-                yield return CreateItem("ImageCatalogGuid");
-            }
-            else if (navigator.LocalName.Equals("ImageAttributes", StringComparison.OrdinalIgnoreCase))
-            {
-                yield return CreateItem("UICONTEXT_CodeWindow");
-                yield return CreateItem("UICONTEXT_Debugging");
-                yield return CreateItem("UICONTEXT_DesignMode");
-                yield return CreateItem("UICONTEXT_Dragging");
-                yield return CreateItem("UICONTEXT_EmptySolution");
-                yield return CreateItem("UICONTEXT_FullScreenMode");
-                yield return CreateItem("UICONTEXT_NoSolution");
-                yield return CreateItem("UICONTEXT_NotBuildingAndNotDebugging");
-                yield return CreateItem("UICONTEXT_SolutionBuilding");
-                yield return CreateItem("UICONTEXT_SolutionExists");
-                yield return CreateItem("UICONTEXT_SolutionExistsAndNotBuildingAndNotDebugging");
-                yield return CreateItem("UICONTEXT_SolutionHasMultipleProjects");
-                yield return CreateItem("UICONTEXT_SolutionHasSingleProject");
-                yield return CreateItem("UICONTEXT_ToolboxInitialized");
-            }
-        }
-
-        private IEnumerable<CompletionItem> GetGuidSymbolIds(XmlDocument doc, XPathNavigator navigator)
-        {
+            IEnumerable<ICompletionProvider> providers = GetProviders(attribute);
             var list = new List<CompletionItem>();
 
-            string guid = navigator.GetAttribute("guid", "");
-
-            if (guid == "ImageCatalogGuid")
+            foreach (ICompletionProvider provider in providers)
             {
-                list.AddRange(_monikerItems);
-            }
-            else if (guid == "guidSHLMainMenu")
-            {
-                list.AddRange(KnownIds.GetItems(_source, _icon));
-            }
-            else
-            {
-                XmlNodeList ids = doc.SelectNodes("//GuidSymbol[@name='" + guid + "']//IDSymbol");
-
-                foreach (XmlNode symbol in ids)
-                {
-                    XmlAttribute name = symbol.Attributes["name"];
-
-                    if (name != null)
-                    {
-                        list.Add(CreateItem(name.Value));
-                    }
-                }
+                list.AddRange(provider.GetCompletions(doc, navigator, CreateCompletionItem));
             }
 
             return list;
         }
 
+        private IEnumerable<ICompletionProvider> GetProviders(string attributeName)
+        {
+            switch (attributeName.ToLowerInvariant())
+            {
+                case "guid":
+                case "package":
+                case "context":
+                    return new ICompletionProvider[] { new GuidSymbolProvider() };
+                case "id":
+                    return new ICompletionProvider[] { new GuidSymbolIdProvider(_monikerItems, _source, _icon) };
+                case "editor":
+                    return new ICompletionProvider[] { new GuidSymbolProvider(), new EditorProvider() };
+                case "href":
+                    return new ICompletionProvider[] { new HrefProvider() };
+            }
+
+            return Enumerable.Empty<ICompletionProvider>();
+        }
+        
         public async Tasks.Task InitializeAsync()
         {
             if (_isInitializing)
@@ -235,7 +150,7 @@ namespace VsctCompletion.Completion
                 {
                     var moniker = (ImageMoniker)monikerName.GetValue(null, null);
                     var icon = new ImageElement(moniker.ToImageId());
-                    CompletionItem item = CreateItem(monikerName.Name);
+                    CompletionItem item = CreateCompletionItem(monikerName.Name);
 
                     var tooltip = new Lazy<object>(() =>
                     {
@@ -257,7 +172,7 @@ namespace VsctCompletion.Completion
             });
         }
 
-        private CompletionItem CreateItem(string value)
+        private CompletionItem CreateCompletionItem(string value)
         {
             return new CompletionItem(value, _source, _icon);
         }
