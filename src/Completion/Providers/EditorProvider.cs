@@ -16,8 +16,9 @@ namespace VsctCompletion.Completion.Providers
             {
                 _items = new List<CompletionItem>
                 {
+                    CreateCompletionItem("GUID_TextEditorFactory"),
                     CreateCompletionItem("guidVSStd97"),
-                    CreateCompletionItem("guidVSStd2K")
+                    CreateCompletionItem("guidVSStd2K"),
                 };
             }
 
