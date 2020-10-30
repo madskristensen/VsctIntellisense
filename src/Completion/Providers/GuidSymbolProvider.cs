@@ -30,8 +30,9 @@ namespace VsctCompletion.Completion.Providers
             {
                 yield return CreateCompletionItem("ImageCatalogGuid");
             }
-            else if (navigator.LocalName.Equals("ImageAttributes", StringComparison.OrdinalIgnoreCase))
+            else if (navigator.LocalName.Equals("VisibilityItem", StringComparison.OrdinalIgnoreCase))
             {
+                yield return CreateCompletionItem("GUID_TextEditorFactory");
                 yield return CreateCompletionItem("UICONTEXT_CodeWindow");
                 yield return CreateCompletionItem("UICONTEXT_Debugging");
                 yield return CreateCompletionItem("UICONTEXT_DesignMode");

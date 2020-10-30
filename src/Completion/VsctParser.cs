@@ -27,7 +27,7 @@ namespace VsctCompletion.Completion
         
         public bool IsAttributeAllowed(string attributeName)
         {
-            string[] allowed = new[] { "id", "guid", "package", "href", "editor" };
+            string[] allowed = new[] { "id", "guid", "package", "href", "editor", "context" };
 
             return allowed.Contains(attributeName, StringComparer.OrdinalIgnoreCase);
         }
