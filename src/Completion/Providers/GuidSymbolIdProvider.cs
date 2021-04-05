@@ -48,7 +48,7 @@ namespace VsctCompletion.Completion.Providers
                     {
                         var typeName = "";
 
-                        if (guid == "VSGlobals")
+                        if (guid.StartsWith("VS", StringComparison.Ordinal))
                         {
                             var isMenu = name.Value.Trim('.').Count(c => c == '.') % 2 == 0;
                             typeName = isMenu ? "<Menu>" : "<Group>";

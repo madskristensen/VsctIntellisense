@@ -18,8 +18,8 @@ namespace VsctCompletion.Completion.Providers
 
                 if (name != null)
                 {
-                    // Only show results for VSGlobals in <parent> nodes
-                    if (navigator.LocalName == "Parent" || name.Value != "VSGlobals")
+                    // Only show results for VS* in <parent> nodes
+                    if (navigator.LocalName == "Parent" || !name.Value.StartsWith("VS", StringComparison.Ordinal))
                     {
                         yield return CreateCompletionItem(name.Value, "Guid");
                     }
