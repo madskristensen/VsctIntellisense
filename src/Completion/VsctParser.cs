@@ -18,16 +18,18 @@ namespace VsctCompletion.Completion
     internal class VsctParser
     {
         private readonly IAsyncCompletionSource _source;
+        private readonly string _directory;
         private static readonly ImageElement _icon = new ImageElement(KnownMonikers.TypePublic.ToImageId());
 
-        public VsctParser(IAsyncCompletionSource source)
+        public VsctParser(IAsyncCompletionSource source, string file)
         {
             _source = source;
+            _directory = Path.GetDirectoryName(file);
         }
-        
+
         public bool IsAttributeAllowed(string attributeName)
         {
-            string[] allowed = new[] { "id", "guid", "package", "href", "editor", "context" };
+            var allowed = new[] { "id", "guid", "package", "href", "editor", "context" };
 
             return allowed.Contains(attributeName, StringComparer.OrdinalIgnoreCase);
         }
@@ -37,16 +39,57 @@ namespace VsctCompletion.Completion
             completions = null;
 
             SnapshotSpan extent = triggerLocation.GetContainingLine().Extent;
-            string line = extent.GetText();
+            var line = extent.GetText();
 
             if (TryGetXmlFragment(line, out XPathNavigator navigator))
             {
-                completions = GetCompletions(ReadXmlDocument(triggerLocation.Snapshot), navigator, attrName).ToArray();
+                XmlDocument vsct = ReadXmlDocument(triggerLocation.Snapshot.GetText());
+                IEnumerable<XmlDocument> allDocs = MergeIncludedVsct(vsct);
+
+                var list = new List<CompletionItem>();
+
+                foreach (XmlDocument doc in allDocs)
+                {
+                    CompletionItem[] comps = GetCompletions(doc, navigator, attrName).ToArray();
+                    list.AddRange(comps);
+                }
+
+                completions = list.Distinct();
             }
 
             return completions != null;
         }
 
+        private readonly Dictionary<XmlDocument, DateTime> _docCache = new Dictionary<XmlDocument, DateTime>();
+
+        private IEnumerable<XmlDocument> MergeIncludedVsct(XmlDocument vsct)
+        {
+            yield return vsct;
+
+            foreach (XmlNode include in vsct.SelectNodes("//CommandTable/Include"))
+            {
+                var href = include.Attributes["href"]?.Value;
+
+                if (href != null)
+                {
+                    var localFile = Path.Combine(_directory, href);
+
+                    if (File.Exists(localFile))
+                    {
+                        DateTime lwt = File.GetLastWriteTimeUtc(localFile);
+                        XmlDocument doc = _docCache.FirstOrDefault(d => d.Value == lwt).Key;
+
+                        if (doc == null)
+                        {
+                            doc = ReadXmlDocument(File.ReadAllText(localFile));
+                            _docCache.Add(doc, File.GetLastWriteTimeUtc(localFile));
+                        }
+
+                        yield return doc;
+                    }
+                }
+            }
+        }
 
         private bool TryGetXmlFragment(string fragment, out XPathNavigator doc)
         {
@@ -76,13 +119,13 @@ namespace VsctCompletion.Completion
             }
         }
 
-        private static XmlDocument ReadXmlDocument(ITextSnapshot snapshot)
+        private static XmlDocument ReadXmlDocument(string xml)
         {
             var doc = new XmlDocument();
 
             try
             {
-                doc.LoadXml(Regex.Replace(snapshot.GetText(), " xmlns(:[^\"]+)?=\"([^\"]+)\"", string.Empty));
+                doc.LoadXml(Regex.Replace(xml, " xmlns(:[^\"]+)?=\"([^\"]+)\"", string.Empty));
                 return doc;
             }
             catch (Exception)

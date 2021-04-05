@@ -25,7 +25,7 @@ namespace VsctCompletion.Completion.Providers
         {
             var list = new List<CompletionItem>();
 
-            string guid = navigator.GetAttribute("guid", "");
+            var guid = navigator.GetAttribute("guid", "");
 
             if (guid == "ImageCatalogGuid")
             {
@@ -45,7 +45,17 @@ namespace VsctCompletion.Completion.Providers
 
                     if (name != null)
                     {
-                        list.Add(CreateItem(name.Value));
+                        var typeName = "";
+
+                        if (guid == "VSGlobals")
+                        {
+                            var isMenu = name.Value.Trim('.').Count(c => c == '.') % 2 == 0;
+                            typeName = isMenu ? "<Menu>" : "<Group>";
+                        }
+
+                        CompletionItem item = CreateItem(name.Value);
+                        item.Properties.AddProperty("type", typeName);
+                        list.Add(item);
                     }
                 }
             }
@@ -59,7 +69,7 @@ namespace VsctCompletion.Completion.Providers
             {
                 var list = new List<CompletionItem>();
 
-                foreach (string name in KnownMonikersList.KnownMonikerNames)
+                foreach (var name in KnownMonikersList.KnownMonikerNames)
                 {
                     var item = new CompletionItem(name, source, icon);
                     item.Properties.AddProperty("knownmoniker", name);
@@ -81,5 +91,5 @@ namespace VsctCompletion.Completion.Providers
 
             return _knownIds;
         }
-     }
+    }
 }

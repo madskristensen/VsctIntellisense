@@ -9,24 +9,27 @@ using Microsoft.VisualStudio.Imaging;
 using Microsoft.VisualStudio.Imaging.Interop;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
+using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Classification;
 using Microsoft.VisualStudio.Text.Operations;
+using Task = System.Threading.Tasks.Task; 
 
 namespace VsctCompletion.Completion
 {
-    class VsctCompletionSource : IAsyncCompletionSource
+    internal class VsctCompletionSource : IAsyncCompletionSource
     {
         private readonly IClassifier _classifier;
         private readonly ITextStructureNavigator _navigator;
         private readonly VsctParser _parser;
         private string _attributeName;
 
-        public VsctCompletionSource(ITextBuffer buffer, IClassifierAggregatorService classifier, ITextStructureNavigatorSelectorService navigator)
+        public VsctCompletionSource(ITextBuffer buffer, IClassifierAggregatorService classifier, ITextStructureNavigatorSelectorService navigator, string file)
         {
             _classifier = classifier.GetClassifier(buffer);
             _navigator = navigator.GetTextStructureNavigator(buffer);
-            _parser = new VsctParser(this);
+
+            _parser = new VsctParser(this, file);
         }
 
         public Task<CompletionContext> GetCompletionContextAsync(IAsyncCompletionSession session, CompletionTrigger trigger, SnapshotPoint triggerLocation, SnapshotSpan applicableToSpan, CancellationToken token)
@@ -39,7 +42,7 @@ namespace VsctCompletion.Completion
             return Task.FromResult(CompletionContext.Empty);
         }
 
-        public Task<object> GetDescriptionAsync(IAsyncCompletionSession session, CompletionItem item, CancellationToken token)
+        public async Task<object> GetDescriptionAsync(IAsyncCompletionSession session, CompletionItem item, CancellationToken token)
         {
             if (item.Properties.TryGetProperty("knownmoniker", out string name))
             {
@@ -48,22 +51,28 @@ namespace VsctCompletion.Completion
                     PropertyInfo property = typeof(KnownMonikers).GetProperty(name, BindingFlags.Static | BindingFlags.Public);
                     var moniker = (ImageMoniker)property.GetValue(null, null);
 
+                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
                     var image = new CrispImage
                     {
-                        Source = moniker.ToBitmap(100),
+                        Source = await moniker.ToBitmapSourceAsync(100),
                         Height = 100,
                         Width = 100,
                     };
-                    
-                    return Task.FromResult<object>(image);
+
+                    return image;
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.Write(ex);
                 }
             }
+            else if (item.Properties.TryGetProperty("type", out string typeName))
+            {
+                return $"This is a global {typeName}";
+            }
 
-            return Task.FromResult<object>(null);
+            return null;
         }
 
         public CompletionStartData InitializeCompletion(CompletionTrigger trigger, SnapshotPoint triggerLocation, CancellationToken token)
@@ -97,11 +106,11 @@ namespace VsctCompletion.Completion
             }
 
             applicapleTo = triggerLocation.GetContainingLine().Extent;
-            string line = applicapleTo.GetText();
+            var line = applicapleTo.GetText();
 
             IList<ClassificationSpan> spans = _classifier.GetClassificationSpans(applicapleTo);
             ClassificationSpan attrValueSpan = spans.FirstOrDefault(s => s.Span.Start <= triggerLocation && s.Span.End >= triggerLocation && s.ClassificationType.IsOfType("XML Attribute Value"));
-            int valueSpanIndex = spans.IndexOf(attrValueSpan);
+            var valueSpanIndex = spans.IndexOf(attrValueSpan);
 
             if (attrValueSpan == null || valueSpanIndex < 3)
             {

@@ -1,31 +1,31 @@
-﻿using Microsoft.VisualStudio;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Xml;
+using System.Xml.Linq;
+using System.Xml.XPath;
+using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.OLE.Interop;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Classification;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.TextManager.Interop;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Xml;
-using System.Xml.Linq;
-using System.Xml.XPath;
 
 namespace VsctCompletion.GoToDifinition
 {
     public partial class VsctGoToDefinitionCommandHandler : IOleCommandTarget
     {
-        private IOleCommandTarget _nextCommandHandler;
-        private ITextView _textView;
-        private VsctGoToDefinitionCreationListener _provider;
+        private readonly IOleCommandTarget _nextCommandHandler;
+        private readonly ITextView _textView;
+        private readonly VsctGoToDefinitionCreationListener _provider;
 
         private IClassifier _classifier;
 
         public VsctGoToDefinitionCommandHandler(IVsTextView textViewAdapter, ITextView textView, VsctGoToDefinitionCreationListener provider)
         {
-            this._textView = textView;
-            this._provider = provider;
+            _textView = textView;
+            _provider = provider;
 
             var hresult = textViewAdapter.AddCommandFilter(this, out _nextCommandHandler);
         }
@@ -106,21 +106,21 @@ namespace VsctCompletion.GoToDifinition
 
             SnapshotPoint currentPoint = _textView.Caret.Position.BufferPosition;
 
-            var spans = _classifier.GetClassificationSpans(new SnapshotSpan(snapshot, 0, snapshot.Length));
+            IList<ClassificationSpan> spans = _classifier.GetClassificationSpans(new SnapshotSpan(snapshot, 0, snapshot.Length));
 
             var firstSpans = spans
                 .Where(s => s.Span.Start < currentPoint.Position)
                 .OrderByDescending(s => s.Span.Start.Position)
                 .ToList();
 
-            var firstDelimiter = firstSpans.FirstOrDefault(s => s.ClassificationType.IsOfType("XML Attribute Quotes"));
+            ClassificationSpan firstDelimiter = firstSpans.FirstOrDefault(s => s.ClassificationType.IsOfType("XML Attribute Quotes"));
 
             var lastSpans = spans
                  .Where(s => s.Span.Start >= currentPoint.Position)
                  .OrderBy(s => s.Span.Start.Position)
                  .ToList();
 
-            var lastDelimiter = lastSpans.FirstOrDefault(s => s.ClassificationType.IsOfType("XML Attribute Quotes"));
+            ClassificationSpan lastDelimiter = lastSpans.FirstOrDefault(s => s.ClassificationType.IsOfType("XML Attribute Quotes"));
 
             SnapshotSpan? extentTemp = null;
 
@@ -138,11 +138,11 @@ namespace VsctCompletion.GoToDifinition
                 return false;
             }
 
-            var extent = extentTemp.Value;
+            SnapshotSpan extent = extentTemp.Value;
 
             var currentValue = extent.GetText();
 
-            var currentXmlNode = GetCurrentXmlNode(doc, extent);
+            XElement currentXmlNode = GetCurrentXmlNode(doc, extent);
 
             if (currentXmlNode == null)
             {
@@ -156,7 +156,7 @@ namespace VsctCompletion.GoToDifinition
                 .OrderByDescending(s => s.Span.Start.Position)
                 .ToList();
 
-            var containingAttributeValue = containingAttributeSpans.FirstOrDefault();
+            ClassificationSpan containingAttributeValue = containingAttributeSpans.FirstOrDefault();
 
             if (containingAttributeValue == null)
             {
@@ -182,8 +182,8 @@ namespace VsctCompletion.GoToDifinition
                 return false;
             }
 
-            string currentNodeName = currentXmlNode.Name.LocalName;
-            string currentAttributeName = currentAttr.Span.GetText();
+            var currentNodeName = currentXmlNode.Name.LocalName;
+            var currentAttributeName = currentAttr.Span.GetText();
 
             if (TryGoToDefinitionInCommandTable(snapshot, doc, currentXmlNode, currentNodeName, currentAttributeName, currentValue))
             {
@@ -195,7 +195,7 @@ namespace VsctCompletion.GoToDifinition
 
         private ClassificationSpan GetCurrentXmlAttributeName(ITextSnapshot snapshot, ClassificationSpan containingSpan, IList<ClassificationSpan> spans)
         {
-            var currentAttr = spans
+            ClassificationSpan currentAttr = spans
                     .Where(s => s.ClassificationType.IsOfType("XML Attribute") && s.Span.Start <= containingSpan.Span.Start)
                     .OrderByDescending(s => s.Span.Start.Position)
                     .FirstOrDefault();
@@ -205,7 +205,7 @@ namespace VsctCompletion.GoToDifinition
                 return currentAttr;
             }
 
-            var allSpans = _classifier.GetClassificationSpans(new SnapshotSpan(containingSpan.Span.Snapshot, 0, containingSpan.Span.Snapshot.Length));
+            IList<ClassificationSpan> allSpans = _classifier.GetClassificationSpans(new SnapshotSpan(containingSpan.Span.Snapshot, 0, containingSpan.Span.Snapshot.Length));
 
             currentAttr = allSpans
                     .Where(s => s.ClassificationType.IsOfType("XML Name"))
@@ -224,7 +224,7 @@ namespace VsctCompletion.GoToDifinition
         {
             IList<ClassificationSpan> spans = _classifier.GetClassificationSpans(new SnapshotSpan(extent.Snapshot, 0, extent.Snapshot.Length));
 
-            var elementSpan = spans
+            ClassificationSpan elementSpan = spans
                      .Where(s => s.ClassificationType.IsOfType("XML Name") && s.Span.Start <= extent.Start)
                      .OrderByDescending(s => s.Span.Start.Position)
                      .FirstOrDefault();
@@ -234,12 +234,12 @@ namespace VsctCompletion.GoToDifinition
                 return null;
             }
 
-            var line = elementSpan.Span.Start.Subtract(1).GetContainingLine();
+            ITextSnapshotLine line = elementSpan.Span.Start.Subtract(1).GetContainingLine();
 
             var lineNumber = line.LineNumber + 1;
             var linePosition = elementSpan.Span.Start.Subtract(1).Position - line.Start.Position + 2;
 
-            var result = doc.DescendantsAndSelf().FirstOrDefault(e => (e as IXmlLineInfo)?.LineNumber == lineNumber);
+            XElement result = doc.DescendantsAndSelf().FirstOrDefault(e => (e as IXmlLineInfo)?.LineNumber == lineNumber);
 
             return result;
         }
@@ -248,7 +248,7 @@ namespace VsctCompletion.GoToDifinition
         {
             try
             {
-                XDocument doc = XDocument.Parse(text, LoadOptions.SetLineInfo);
+                var doc = XDocument.Parse(text, LoadOptions.SetLineInfo);
 
                 return doc.Root;
             }
@@ -260,7 +260,7 @@ namespace VsctCompletion.GoToDifinition
 
         private bool TryGoToDefinitionInCommandTable(ITextSnapshot snapshot, XElement doc, XElement currentXmlNode, string currentNodeName, string currentAttributeName, string currentValue)
         {
-            var defaultNamespace = doc.GetDefaultNamespace();
+            XNamespace defaultNamespace = doc.GetDefaultNamespace();
 
             var namespaceManager = new XmlNamespaceManager(new NameTable());
             namespaceManager.AddNamespace("defaulttablenamespace", defaultNamespace.ToString());
@@ -277,9 +277,9 @@ namespace VsctCompletion.GoToDifinition
 
                     if (elements.Count == 1)
                     {
-                        var guidXmlElement = elements[0];
+                        XElement guidXmlElement = elements[0];
 
-                        var attributeGuidName = guidXmlElement.Attribute("name");
+                        XAttribute attributeGuidName = guidXmlElement.Attribute("name");
 
                         if (attributeGuidName != null)
                         {
@@ -302,7 +302,7 @@ namespace VsctCompletion.GoToDifinition
 
                 if (elements.Count == 1)
                 {
-                    var symbolsXmlElement = elements[0];
+                    XElement symbolsXmlElement = elements[0];
 
                     if (TryMoveToElement(snapshot, symbolsXmlElement))
                     {
@@ -313,7 +313,7 @@ namespace VsctCompletion.GoToDifinition
 
             if (string.Equals(currentAttributeName, "id", StringComparison.InvariantCultureIgnoreCase))
             {
-                var guidAttribute = currentXmlNode.Attribute("guid");
+                XAttribute guidAttribute = currentXmlNode.Attribute("guid");
 
                 if (guidAttribute != null && !string.IsNullOrEmpty(guidAttribute.Value))
                 {
@@ -323,7 +323,7 @@ namespace VsctCompletion.GoToDifinition
 
                     if (elements.Count == 1)
                     {
-                        var guidXmlElement = elements[0];
+                        XElement guidXmlElement = elements[0];
 
                         if (!string.IsNullOrEmpty(currentValue))
                         {
@@ -333,9 +333,9 @@ namespace VsctCompletion.GoToDifinition
 
                             if (elements.Count == 1)
                             {
-                                var idXmlElement = elements[0];
+                                XElement idXmlElement = elements[0];
 
-                                var attributeIdName = idXmlElement.Attribute("name");
+                                XAttribute attributeIdName = idXmlElement.Attribute("name");
 
                                 if (attributeIdName != null)
                                 {
@@ -354,7 +354,7 @@ namespace VsctCompletion.GoToDifinition
                             }
                         }
 
-                        var attributeGuidName = guidXmlElement.Attribute("name");
+                        XAttribute attributeGuidName = guidXmlElement.Attribute("name");
 
                         if (attributeGuidName != null)
                         {
@@ -377,7 +377,7 @@ namespace VsctCompletion.GoToDifinition
 
                         if (elements.Count == 1)
                         {
-                            var symbolsXmlElement = elements[0];
+                            XElement symbolsXmlElement = elements[0];
 
                             if (TryMoveToElement(snapshot, symbolsXmlElement))
                             {
@@ -398,11 +398,11 @@ namespace VsctCompletion.GoToDifinition
                 return false;
             }
 
-            var line = snapshot.GetLineFromLineNumber(xmlElement.LineNumber - 1);
+            ITextSnapshotLine line = snapshot.GetLineFromLineNumber(xmlElement.LineNumber - 1);
 
             if (line != null)
             {
-                var point = line.Start;
+                SnapshotPoint point = line.Start;
 
                 _textView.ViewScroller.EnsureSpanVisible(new SnapshotSpan(point, 0), EnsureSpanVisibleOptions.ShowStart | EnsureSpanVisibleOptions.AlwaysCenter);
 
