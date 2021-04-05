@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -19,7 +20,7 @@ namespace VsctCompletion.Completion
     {
         private readonly IAsyncCompletionSource _source;
         private readonly string _directory;
-        private static readonly ImageElement _icon = new ImageElement(KnownMonikers.TypePublic.ToImageId());
+        private static readonly ImageElement _icon = new(KnownMonikers.TypePublic.ToImageId());
 
         public VsctParser(IAsyncCompletionSource source, string file)
         {
@@ -51,7 +52,14 @@ namespace VsctCompletion.Completion
                 foreach (XmlDocument doc in allDocs)
                 {
                     CompletionItem[] comps = GetCompletions(doc, navigator, attrName).ToArray();
-                    list.AddRange(comps);
+
+                    foreach (CompletionItem item in comps)
+                    {
+                        if (!list.Any(c => c.DisplayText == item.DisplayText))
+                        {
+                            list.Add(item);
+                        }
+                    }
                 }
 
                 completions = list.Distinct();
@@ -60,7 +68,7 @@ namespace VsctCompletion.Completion
             return completions != null;
         }
 
-        private readonly Dictionary<XmlDocument, DateTime> _docCache = new Dictionary<XmlDocument, DateTime>();
+        private readonly Dictionary<XmlDocument, DateTime> _docCache = new();
 
         private IEnumerable<XmlDocument> MergeIncludedVsct(XmlDocument vsct)
         {
@@ -166,9 +174,11 @@ namespace VsctCompletion.Completion
             return Enumerable.Empty<ICompletionProvider>();
         }
 
-        private CompletionItem CreateCompletionItem(string value)
+        private ImmutableArray<CompletionFilter> _filters = ImmutableArray.Create<CompletionFilter>();
+
+        private CompletionItem CreateCompletionItem(string value, string suffix = "")
         {
-            return new CompletionItem(value, _source, _icon);
+            return new CompletionItem(value, _source, _icon, _filters, suffix);
         }
     }
 }

@@ -67,10 +67,6 @@ namespace VsctCompletion.Completion
                     System.Diagnostics.Debug.Write(ex);
                 }
             }
-            else if (item.Properties.TryGetProperty("type", out string typeName))
-            {
-                return $"This is a global {typeName}";
-            }
 
             return null;
         }

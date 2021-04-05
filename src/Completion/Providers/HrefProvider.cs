@@ -8,16 +8,16 @@ namespace VsctCompletion.Completion.Providers
 {
     public class HrefProvider : ICompletionProvider
     {
-        public IEnumerable<CompletionItem> GetCompletions(XmlDocument doc, XPathNavigator navigator, Func<string, CompletionItem> CreateCompletionItem)
+        public IEnumerable<CompletionItem> GetCompletions(XmlDocument doc, XPathNavigator navigator, Func<string, string, CompletionItem> CreateCompletionItem)
         {
             if (navigator.LocalName == "Extern")
             {
-                yield return CreateCompletionItem("stdidcmd.h");
-                yield return CreateCompletionItem("vsshlids.h");
+                yield return CreateCompletionItem("stdidcmd.h", "Def");
+                yield return CreateCompletionItem("vsshlids.h", "Def");
             }
             else if (navigator.LocalName == "Include")
             {
-                yield return CreateCompletionItem("KnownImageIds.vsct");
+                yield return CreateCompletionItem("KnownImageIds.vsct", "KnownMonikers");
             }
         }
     }

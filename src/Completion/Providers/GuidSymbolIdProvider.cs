@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Xml;
 using System.Xml.XPath;
@@ -21,7 +22,7 @@ namespace VsctCompletion.Completion.Providers
             _icon = icon;
         }
 
-        public IEnumerable<CompletionItem> GetCompletions(XmlDocument doc, XPathNavigator navigator, Func<string, CompletionItem> CreateItem)
+        public IEnumerable<CompletionItem> GetCompletions(XmlDocument doc, XPathNavigator navigator, Func<string, string, CompletionItem> CreateItem)
         {
             var list = new List<CompletionItem>();
 
@@ -53,8 +54,7 @@ namespace VsctCompletion.Completion.Providers
                             typeName = isMenu ? "<Menu>" : "<Group>";
                         }
 
-                        CompletionItem item = CreateItem(name.Value);
-                        item.Properties.AddProperty("type", typeName);
+                        CompletionItem item = CreateItem(name.Value, typeName);
                         list.Add(item);
                     }
                 }
@@ -71,7 +71,7 @@ namespace VsctCompletion.Completion.Providers
 
                 foreach (var name in KnownMonikersList.KnownMonikerNames)
                 {
-                    var item = new CompletionItem(name, source, icon);
+                    var item = new CompletionItem(name, source, icon, ImmutableArray.Create<CompletionFilter>(), "Image");
                     item.Properties.AddProperty("knownmoniker", name);
                     list.Add(item);
                 }
@@ -86,7 +86,7 @@ namespace VsctCompletion.Completion.Providers
         {
             if (_knownIds == null)
             {
-                _knownIds = KnownIdList.KnownIds.Select(k => new CompletionItem(k, source, icon));
+                _knownIds = KnownIdList.KnownIds.Select(k => new CompletionItem(k, source, icon, ImmutableArray.Create<CompletionFilter>(), "Group/Menu"));
             }
 
             return _knownIds;

@@ -10,15 +10,15 @@ namespace VsctCompletion.Completion.Providers
     {
         private static List<CompletionItem> _items;
 
-        public IEnumerable<CompletionItem> GetCompletions(XmlDocument doc, XPathNavigator navigator, Func<string, CompletionItem> CreateCompletionItem)
+        public IEnumerable<CompletionItem> GetCompletions(XmlDocument doc, XPathNavigator navigator, Func<string, string, CompletionItem> CreateCompletionItem)
         {
             if (_items == null)
             {
                 _items = new List<CompletionItem>
                 {
-                    CreateCompletionItem("GUID_TextEditorFactory"),
-                    CreateCompletionItem("guidVSStd97"),
-                    CreateCompletionItem("guidVSStd2K"),
+                    CreateCompletionItem("GUID_TextEditorFactory", "Guid"),
+                    CreateCompletionItem("guidVSStd97", "Guid"),
+                    CreateCompletionItem("guidVSStd2K", "Guid"),
                 };
             }
 

@@ -8,6 +8,6 @@ namespace VsctCompletion.Completion.Providers
 {
     internal interface ICompletionProvider
     {
-        IEnumerable<CompletionItem> GetCompletions(XmlDocument doc, XPathNavigator navigator, Func<string, CompletionItem> CreateCompletionItem);
+        IEnumerable<CompletionItem> GetCompletions(XmlDocument doc, XPathNavigator navigator, Func<string, string, CompletionItem> CreateCompletionItem);
     }
 }
