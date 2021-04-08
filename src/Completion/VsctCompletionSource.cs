@@ -73,12 +73,12 @@ namespace VsctCompletion.Completion
             }
             else if (item.Properties.TryGetProperty("IsGlobal", out bool isGlobal) && isGlobal)
             {
-                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
                 var img = GetFileName(item.DisplayText);
 
                 if (!string.IsNullOrEmpty(img))
                 {
+                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                    
                     return new Image
                     {
                         Source = new BitmapImage(new Uri(img)),
@@ -90,7 +90,7 @@ namespace VsctCompletion.Completion
             return null;
         }
 
-        private static string GetFileName(string displayName)
+        public static string GetFileName(string displayName)
         {
             var vsixDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             var menusDir = Path.Combine(vsixDir, "Resources\\Menus");
