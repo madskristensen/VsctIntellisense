@@ -5,8 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
-using Microsoft.VisualStudio.Core.Imaging;
-using Microsoft.VisualStudio.Imaging;
 using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
@@ -17,8 +15,6 @@ namespace VsctCompletion
 {
     internal sealed class IdQuickInfoSource : IAsyncQuickInfoSource
     {
-        private static readonly ImageId _icon = KnownMonikers.AbstractCube.ToImageId();
-
         private readonly ITextBuffer _buffer;
         private readonly IClassifier _classifier;
 
