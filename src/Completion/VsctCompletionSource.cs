@@ -1,10 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Controls;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
 using Microsoft.VisualStudio.Imaging;
 using Microsoft.VisualStudio.Imaging.Interop;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
@@ -13,7 +17,7 @@ using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Classification;
 using Microsoft.VisualStudio.Text.Operations;
-using Task = System.Threading.Tasks.Task; 
+using Task = System.Threading.Tasks.Task;
 
 namespace VsctCompletion.Completion
 {
@@ -66,6 +70,43 @@ namespace VsctCompletion.Completion
                 {
                     System.Diagnostics.Debug.Write(ex);
                 }
+            }
+            else if (item.Properties.TryGetProperty("IsGlobal", out bool isGlobal) && isGlobal)
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                var img = GetFileName(item.DisplayText);
+
+                if (!string.IsNullOrEmpty(img))
+                {
+                    return new Image
+                    {
+                        Source = new BitmapImage(new Uri(img)),
+                        MaxHeight = 500
+                    };
+                }
+            }
+
+            return null;
+        }
+
+        private static string GetFileName(string displayName)
+        {
+            var vsixDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            var menusDir = Path.Combine(vsixDir, "Resources\\Menus");
+            
+            var fileName = displayName;
+            
+            while (!string.IsNullOrEmpty(fileName))
+            {
+                var file = Path.Combine(menusDir, fileName + ".png");
+                if (File.Exists(file))
+                {
+                    return file;
+                }
+
+                var sections = fileName.Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries);
+                fileName = string.Join(".", sections.Take(sections.Length - 1));
             }
 
             return null;

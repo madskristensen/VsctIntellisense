@@ -46,15 +46,18 @@ namespace VsctCompletion.Completion.Providers
 
                     if (name != null)
                     {
-                        var typeName = "";
-
+                        CompletionItem item;
                         if (guid.StartsWith("VS", StringComparison.Ordinal))
                         {
                             var isMenu = name.Value.Trim('.').Count(c => c == '.') % 2 == 0;
-                            typeName = isMenu ? "<Menu>" : "<Group>";
+                            var typeName = isMenu ? "<Menu>" : "<Group>";
+                            item = CreateItem(name.Value, typeName);
+                            item.Properties.AddProperty("IsGlobal", true);
+                        }
+                        else {
+                            item = CreateItem(name.Value, "");
                         }
 
-                        CompletionItem item = CreateItem(name.Value, typeName);
                         list.Add(item);
                     }
                 }
