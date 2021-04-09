@@ -82,7 +82,7 @@ namespace VsctCompletion.Completion
                     return new Image
                     {
                         Source = new BitmapImage(new Uri(img)),
-                        MaxHeight = 500
+                        MaxHeight = 720 // VS minimum requirements is 1280x720
                     };
                 }
             }
