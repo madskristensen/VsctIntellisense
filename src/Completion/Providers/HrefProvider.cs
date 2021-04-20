@@ -18,6 +18,7 @@ namespace VsctCompletion.Completion.Providers
             else if (navigator.LocalName == "Include")
             {
                 yield return CreateCompletionItem("KnownImageIds.vsct", "KnownMonikers");
+                yield return CreateCompletionItem("VSGlobals.vsct", "Aliases");
             }
         }
     }

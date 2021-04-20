@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.XPath;
@@ -73,14 +74,21 @@ namespace VsctCompletion.Completion
         private IEnumerable<XmlDocument> MergeIncludedVsct(XmlDocument vsct)
         {
             yield return vsct;
+            XmlNodeList includes = vsct.SelectNodes("//CommandTable/Include");
 
-            foreach (XmlNode include in vsct.SelectNodes("//CommandTable/Include"))
+            foreach (XmlNode include in includes)
             {
                 var href = include.Attributes["href"]?.Value;
 
                 if (href != null)
                 {
                     var localFile = Path.Combine(_directory, href);
+
+                    if (!File.Exists(localFile) && href.Equals("VSGlobals.vsct", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var extDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                        localFile = Path.Combine(extDir, "Resources\\VSGlobals.vsct");
+                    }
 
                     if (File.Exists(localFile))
                     {
