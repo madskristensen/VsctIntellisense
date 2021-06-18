@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>e022858e-e475-44ce-8cdc-d673ed8d7f2c</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>VsctCompletionShared</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Completion\Providers\EditorProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Completion\Providers\GuidSymbolIdProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Completion\Providers\GuidSymbolProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Completion\Providers\HrefProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Completion\Providers\ICompletionProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Completion\Providers\KnownIdList.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Completion\Providers\KnownMonikersList.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Completion\VsctCompletionSource.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Completion\VsctCompletionSourceProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Completion\VsctParser.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)ContentTypes\VsctContentTypeDefinition.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)ExtensionMethods.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GoToDifinition\VsctGoToDefinitionCommandHandler.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GoToDifinition\VsctGoToDefinitionCreationListener.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QuickInfo\IdQuickInfoProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QuickInfo\IdQuickInfoSource.cs" />
+  </ItemGroup>
+</Project>

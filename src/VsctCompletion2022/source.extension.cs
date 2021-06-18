@@ -7,8 +7,8 @@ namespace VsctCompletion
 {
     internal sealed partial class Vsix
     {
-        public const string Id = "6c042f35-bf5c-4cf2-826e-05d6d12e5309";
-        public const string Name = "VSCT IntelliSense";
+        public const string Id = "6c042f35-bf5c-4cf2-826e-05d6d12e5300";
+        public const string Name = "VSCT IntelliSense 2022";
         public const string Description = @"Gives IntelliSense for .vsct files used by Visual Studio extension authors.";
         public const string Language = "en-US";
         public const string Version = "1.0.2";
