@@ -1,6 +1,6 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
@@ -13,31 +13,35 @@ using VsctCompletion.Completion;
 
 namespace VsctCompletion
 {
-    internal sealed class IdQuickInfoSource : IAsyncQuickInfoSource
+    internal sealed class IdQuickInfoSource(ITextBuffer buffer, IClassifier classifier) : IAsyncQuickInfoSource
     {
-        private readonly ITextBuffer _buffer;
-        private readonly IClassifier _classifier;
-
-        public IdQuickInfoSource(ITextBuffer buffer, IClassifier classifier)
-        {
-            _buffer = buffer;
-            _classifier = classifier;
-        }
+        // Cache for loaded images to avoid reloading
+        private static readonly ConcurrentDictionary<string, BitmapImage> _imageCache = new();
 
         // This is called on a background thread.
         public async Task<QuickInfoItem> GetQuickInfoItemAsync(IAsyncQuickInfoSession session, CancellationToken cancellationToken)
         {
-            SnapshotPoint? triggerPoint = session.GetTriggerPoint(_buffer.CurrentSnapshot);
+            SnapshotPoint? triggerPoint = session.GetTriggerPoint(buffer.CurrentSnapshot);
 
             if (triggerPoint != null)
             {
                 ITextSnapshotLine line = triggerPoint.Value.GetContainingLine();
-                IList<ClassificationSpan> spans = _classifier.GetClassificationSpans(line.Extent);
-                ClassificationSpan attrValue = spans.FirstOrDefault(s => s.ClassificationType.IsOfType("XML Attribute Value") && s.Span.Contains(triggerPoint.Value.Position));
+                // Use a for loop for better performance
+                IList<ClassificationSpan> spans = classifier.GetClassificationSpans(line.Extent);
+                ClassificationSpan attrValue = null;
+                for (var i = 0; i < spans.Count; i++)
+                {
+                    ClassificationSpan s = spans[i];
+                    if (s.ClassificationType.IsOfType("XML Attribute Value") && s.Span.Contains(triggerPoint.Value.Position))
+                    {
+                        attrValue = s;
+                        break;
+                    }
+                }
 
                 if (attrValue != null)
                 {
-                    ITrackingSpan id = _buffer.CurrentSnapshot.CreateTrackingSpan(attrValue.Span, SpanTrackingMode.EdgeInclusive);
+                    ITrackingSpan id = buffer.CurrentSnapshot.CreateTrackingSpan(attrValue.Span, SpanTrackingMode.EdgeInclusive);
 
                     var fileName = VsctCompletionSource.GetFileName(attrValue.Span.GetText());
 
@@ -46,10 +50,11 @@ namespace VsctCompletion
                     {
                         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
+                        // Use cache to avoid reloading images
                         var img = new Image
                         {
-                            Source = new BitmapImage(new Uri(fileName)),
-                            MaxHeight = 500
+                            MaxHeight = 500,
+                            Source = _imageCache.GetOrAdd(fileName, fn => new BitmapImage(new Uri(fn)))
                         };
 
                         return new QuickInfoItem(id, img);

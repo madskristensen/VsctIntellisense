@@ -17,29 +17,23 @@ using VsctCompletion.Completion.Providers;
 
 namespace VsctCompletion.Completion
 {
-    internal class VsctParser
+    internal class VsctParser(IAsyncCompletionSource source, string file)
     {
-        private readonly IAsyncCompletionSource _source;
-        private readonly string _directory;
+        private readonly string _directory = Path.GetDirectoryName(file);
         private static readonly ImageElement _icon = new(KnownMonikers.TypePublic.ToImageId());
 
-        public VsctParser(IAsyncCompletionSource source, string file)
-        {
-            _source = source;
-            _directory = Path.GetDirectoryName(file);
-        }
+        // Improved cache: by file path and last write time
+        private readonly Dictionary<string, (DateTime LastWrite, XmlDocument Doc)> _docCache = [];
 
         public bool IsAttributeAllowed(string attributeName)
         {
             var allowed = new[] { "id", "guid", "package", "href", "editor", "context" };
-
             return allowed.Contains(attributeName, StringComparer.OrdinalIgnoreCase);
         }
 
         public bool TryGetCompletionList(SnapshotPoint triggerLocation, string attrName, out IEnumerable<CompletionItem> completions)
         {
             completions = null;
-
             SnapshotSpan extent = triggerLocation.GetContainingLine().Extent;
             var line = extent.GetText();
 
@@ -49,59 +43,60 @@ namespace VsctCompletion.Completion
                 IEnumerable<XmlDocument> allDocs = MergeIncludedVsct(vsct);
 
                 var list = new List<CompletionItem>();
-
                 foreach (XmlDocument doc in allDocs)
                 {
-                    CompletionItem[] comps = GetCompletions(doc, navigator, attrName).ToArray();
-
-                    foreach (CompletionItem item in comps)
+                    CompletionItem[] comps = [.. GetCompletions(doc, navigator, attrName)];
+                    for (var i = 0; i < comps.Length; i++)
                     {
-                        if (!list.Any(c => c.DisplayText == item.DisplayText))
+                        CompletionItem item = comps[i];
+                        var exists = false;
+                        for (var j = 0; j < list.Count; j++)
+                        {
+                            if (list[j].DisplayText == item.DisplayText)
+                            {
+                                exists = true;
+                                break;
+                            }
+                        }
+                        if (!exists)
                         {
                             list.Add(item);
                         }
                     }
                 }
-
                 completions = list.Distinct();
             }
-
             return completions != null;
         }
-
-        private readonly Dictionary<XmlDocument, DateTime> _docCache = new();
 
         private IEnumerable<XmlDocument> MergeIncludedVsct(XmlDocument vsct)
         {
             yield return vsct;
             XmlNodeList includes = vsct.SelectNodes("//CommandTable/Include");
-
             foreach (XmlNode include in includes)
             {
                 var href = include.Attributes["href"]?.Value;
-
                 if (href != null)
                 {
                     var localFile = Path.Combine(_directory, href);
-
                     if (!File.Exists(localFile) && href.Equals("VSGlobals.vsct", StringComparison.OrdinalIgnoreCase))
                     {
                         var extDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
                         localFile = Path.Combine(extDir, "Resources\\VSGlobals.vsct");
                     }
-
                     if (File.Exists(localFile))
                     {
                         DateTime lwt = File.GetLastWriteTimeUtc(localFile);
-                        XmlDocument doc = _docCache.FirstOrDefault(d => d.Value == lwt).Key;
-
-                        if (doc == null)
+                        if (_docCache.TryGetValue(localFile, out (DateTime LastWrite, XmlDocument Doc) entry) && entry.LastWrite == lwt)
                         {
-                            doc = ReadXmlDocument(File.ReadAllText(localFile));
-                            _docCache.Add(doc, File.GetLastWriteTimeUtc(localFile));
+                            yield return entry.Doc;
                         }
-
-                        yield return doc;
+                        else
+                        {
+                            XmlDocument doc = ReadXmlDocument(File.ReadAllText(localFile));
+                            _docCache[localFile] = (lwt, doc);
+                            yield return doc;
+                        }
                     }
                 }
             }
@@ -114,34 +109,45 @@ namespace VsctCompletion.Completion
                 ConformanceLevel = ConformanceLevel.Fragment,
                 Async = true
             };
-
-            // Fixes open elements
-            fragment = fragment
-                .Replace("/>", ">")
-                .Replace(">", "/>");
-
+            // Try to parse as-is, fallback to fixing open elements if needed
             try
             {
-                var reader = XmlReader.Create(new StringReader(fragment), settings);
+                using var reader = XmlReader.Create(new StringReader(fragment), settings);
                 doc = new XPathDocument(reader).CreateNavigator();
-                doc.MoveToFirstChild();
-
+                _ = doc.MoveToFirstChild();
                 return true;
             }
             catch (Exception)
             {
-                doc = null;
-                return false;
+                // Fallback: try to fix open elements
+                fragment = fragment.Replace("/>", ">")
+                                   .Replace(">", "/>");
+                try
+                {
+                    using var reader = XmlReader.Create(new StringReader(fragment), settings);
+                    doc = new XPathDocument(reader).CreateNavigator();
+                    _ = doc.MoveToFirstChild();
+                    return true;
+                }
+                catch
+                {
+                    doc = null;
+                    return false;
+                }
             }
         }
 
+        // Improved: only remove xmlns if present
         private static XmlDocument ReadXmlDocument(string xml)
         {
             var doc = new XmlDocument();
-
             try
             {
-                doc.LoadXml(Regex.Replace(xml, " xmlns(:[^\"]+)?=\"([^\"]+)\"", string.Empty));
+                if (xml.Contains("xmlns"))
+                {
+                    xml = Regex.Replace(xml, " xmlns(:[^\"]+)?=\"([^\"]+)\"", string.Empty);
+                }
+                doc.LoadXml(xml);
                 return doc;
             }
             catch (Exception)
@@ -154,39 +160,30 @@ namespace VsctCompletion.Completion
         {
             IEnumerable<ICompletionProvider> providers = GetProviders(attribute);
             var list = new List<CompletionItem>();
-
             foreach (ICompletionProvider provider in providers)
             {
                 list.AddRange(provider.GetCompletions(doc, navigator, CreateCompletionItem));
             }
-
             return list;
         }
 
         private IEnumerable<ICompletionProvider> GetProviders(string attributeName)
         {
-            switch (attributeName.ToLowerInvariant())
+            return attributeName.ToLowerInvariant() switch
             {
-                case "guid":
-                case "package":
-                case "context":
-                    return new ICompletionProvider[] { new GuidSymbolProvider() };
-                case "id":
-                    return new ICompletionProvider[] { new GuidSymbolIdProvider(_source, _icon) };
-                case "editor":
-                    return new ICompletionProvider[] { new GuidSymbolProvider(), new EditorProvider() };
-                case "href":
-                    return new ICompletionProvider[] { new HrefProvider() };
-            }
-
-            return Enumerable.Empty<ICompletionProvider>();
+                "guid" or "package" or "context" => [new GuidSymbolProvider()],
+                "id" => [new GuidSymbolIdProvider(source, _icon)],
+                "editor" => [new GuidSymbolProvider(), new EditorProvider()],
+                "href" => [new HrefProvider()],
+                _ => [],
+            };
         }
 
         private ImmutableArray<CompletionFilter> _filters = ImmutableArray.Create<CompletionFilter>();
 
         private CompletionItem CreateCompletionItem(string value, string suffix = "")
         {
-            return new CompletionItem(value, _source, _icon, _filters, suffix);
+            return new CompletionItem(value, source, _icon, _filters, suffix);
         }
     }
 }
