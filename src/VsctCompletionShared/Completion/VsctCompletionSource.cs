@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
@@ -23,6 +23,7 @@ namespace VsctCompletion.Completion
 {
     internal class VsctCompletionSource : IAsyncCompletionSource
     {
+        private readonly ITextBuffer _buffer;
         private readonly IClassifier _classifier;
         private readonly ITextStructureNavigator _navigator;
         private readonly VsctParser _parser;
@@ -30,6 +31,7 @@ namespace VsctCompletion.Completion
 
         public VsctCompletionSource(ITextBuffer buffer, IClassifierAggregatorService classifier, ITextStructureNavigatorSelectorService navigator, string file)
         {
+            _buffer = buffer;
             _classifier = classifier.GetClassifier(buffer);
             _navigator = navigator.GetTextStructureNavigator(buffer);
 
@@ -126,7 +128,16 @@ namespace VsctCompletion.Completion
 
         private bool IsXmlAttributeValue(SnapshotPoint triggerLocation)
         {
-            TextExtent extent = _navigator.GetExtentOfWord(triggerLocation - 1);
+            // Ensure the trigger location is on the correct buffer's snapshot
+            ITextSnapshot currentSnapshot = _buffer.CurrentSnapshot;
+            SnapshotPoint translatedPoint = triggerLocation.TranslateTo(currentSnapshot, PointTrackingMode.Positive);
+
+            if (translatedPoint.Position == 0)
+            {
+                return false;
+            }
+
+            TextExtent extent = _navigator.GetExtentOfWord(translatedPoint - 1);
             IList<ClassificationSpan> spans = _classifier.GetClassificationSpans(extent.Span);
 
             return spans.Any(s => s.ClassificationType.IsOfType("XML Attribute Value"));
