@@ -128,9 +128,24 @@ namespace VsctCompletion.Completion
 
         private bool IsXmlAttributeValue(SnapshotPoint triggerLocation)
         {
-            // Ensure the trigger location is on the correct buffer's snapshot
             ITextSnapshot currentSnapshot = _buffer.CurrentSnapshot;
-            SnapshotPoint translatedPoint = triggerLocation.TranslateTo(currentSnapshot, PointTrackingMode.Positive);
+
+            // VS can sometimes provide a trigger point from a different buffer (e.g. projection buffers).
+            // SnapshotPoint.TranslateTo requires both snapshots to belong to the same text buffer.
+            if (triggerLocation.Snapshot?.TextBuffer != currentSnapshot.TextBuffer)
+            {
+                return false;
+            }
+
+            SnapshotPoint translatedPoint;
+            try
+            {
+                translatedPoint = triggerLocation.TranslateTo(currentSnapshot, PointTrackingMode.Positive);
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
 
             if (translatedPoint.Position == 0)
             {
@@ -145,19 +160,40 @@ namespace VsctCompletion.Completion
 
         private bool IsCompletionSupported(SnapshotPoint triggerLocation, out string attributeName, out SnapshotSpan applicapleTo)
         {
-            applicapleTo = new SnapshotSpan(triggerLocation, 0);
+            ITextSnapshot currentSnapshot = _buffer.CurrentSnapshot;
+
+            if (triggerLocation.Snapshot?.TextBuffer != currentSnapshot.TextBuffer)
+            {
+                applicapleTo = new SnapshotSpan(currentSnapshot, 0, 0);
+                attributeName = null;
+                return false;
+            }
+
+            SnapshotPoint translatedPoint;
+            try
+            {
+                translatedPoint = triggerLocation.TranslateTo(currentSnapshot, PointTrackingMode.Positive);
+            }
+            catch (ArgumentException)
+            {
+                applicapleTo = new SnapshotSpan(currentSnapshot, 0, 0);
+                attributeName = null;
+                return false;
+            }
+
+            applicapleTo = new SnapshotSpan(translatedPoint, 0);
             attributeName = null;
 
-            if (!IsXmlAttributeValue(triggerLocation))
+            if (!IsXmlAttributeValue(translatedPoint))
             {
                 return false;
             }
 
-            applicapleTo = triggerLocation.GetContainingLine().Extent;
+            applicapleTo = translatedPoint.GetContainingLine().Extent;
             var line = applicapleTo.GetText();
 
             IList<ClassificationSpan> spans = _classifier.GetClassificationSpans(applicapleTo);
-            ClassificationSpan attrValueSpan = spans.FirstOrDefault(s => s.Span.Start <= triggerLocation && s.Span.End >= triggerLocation && s.ClassificationType.IsOfType("XML Attribute Value"));
+            ClassificationSpan attrValueSpan = spans.FirstOrDefault(s => s.Span.Start <= translatedPoint && s.Span.End >= translatedPoint && s.ClassificationType.IsOfType("XML Attribute Value"));
             var valueSpanIndex = spans.IndexOf(attrValueSpan);
 
             if (attrValueSpan == null || valueSpanIndex < 3)
